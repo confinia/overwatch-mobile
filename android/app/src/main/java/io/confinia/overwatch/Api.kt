@@ -31,6 +31,9 @@ data class Health(
 object Api {
     private const val BASE = "https://overwatch.confinia.io/api/v1"
 
+    /** exposed for extension calls that build their own query strings */
+    suspend fun rawGet(path: String): String = get(path)
+
     private suspend fun get(path: String): String = withContext(Dispatchers.IO) {
         val conn = URL("$BASE/$path").openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000; conn.readTimeout = 15_000
@@ -88,4 +91,26 @@ object Api {
             baselineRate = o["baseline_rate"]?.jsonPrimitive?.doubleOrNull,
         )
     }
+}
+
+
+data class Frame(val ts: String, val fields: Int)
+data class PassDetail(val satellite: String, val aos: String, val los: String,
+                      val maxEl: Double, val durationS: Int, val frames: List<Frame>)
+
+suspend fun Api.passDetail(observer: String, norad: Int, aos: String): PassDetail {
+    val path = "stations/${URLEncoder.encode(observer, "UTF-8")}/pass" +
+        "?norad=$norad&aos=${URLEncoder.encode(aos, "UTF-8")}"
+    val o = Json.parseToJsonElement(rawGet(path)).jsonObject
+    return PassDetail(
+        satellite = o["satellite"]!!.jsonPrimitive.content,
+        aos = o["aos"]!!.jsonPrimitive.content,
+        los = o["los"]!!.jsonPrimitive.content,
+        maxEl = o["max_el_deg"]!!.jsonPrimitive.doubleOrNull ?: 0.0,
+        durationS = o["duration_s"]!!.jsonPrimitive.intOrNull ?: 0,
+        frames = o["frames"]!!.jsonArray.map { f ->
+            val j = f.jsonObject
+            Frame(j["ts"]!!.jsonPrimitive.content,
+                  j["fields"]!!.jsonPrimitive.intOrNull ?: 0)
+        })
 }

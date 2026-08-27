@@ -95,7 +95,9 @@ struct StationView: View {
                         PassCard(title: "Next passes", passes: h.next_passes, when: when)
                     }
                     if let past = h.past_passes, !past.isEmpty {
-                        PassCard(title: "Recent passes", passes: past, when: when)
+                        PassCard(title: "Recent passes", passes: past, when: when,
+                                 detail: { p in PassDetailView(
+                                    observer: observer, pass: p, when: when) })
                     }
                 } else if failed {
                     Unreachable(text: "Couldn't load \(observer)") {
@@ -168,15 +170,30 @@ struct Unreachable: View {
 
 /// One card of passes. Past passes carry frames: green when the station heard
 /// the pass, dim red zero when it did not — the per-pass "was it me?".
-struct PassCard: View {
+struct PassCard<Detail: View>: View {
     let title: String
     let passes: [API.Pass]
     let when: (String) -> String
+    /// When set, tapping a row pushes the frame-by-frame view (#368).
+    var detail: ((API.Pass) -> Detail)? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).bold()
             ForEach(passes, id: \.self) { p in
-                HStack {
+                row(p)
+            }
+        }
+        .padding().frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
+    }
+    @ViewBuilder func row(_ p: API.Pass) -> some View {
+        if let detail {
+            NavigationLink { detail(p) } label: { rowBody(p, chevron: true) }
+                .buttonStyle(.plain)
+        } else { rowBody(p, chevron: false) }
+    }
+    func rowBody(_ p: API.Pass, chevron: Bool) -> some View {
+        HStack {
                     // "about this satellite" = our own control room, which has
                     // the note, dashboards and 3D view — no second data source
                     Link(p.satellite, destination:
@@ -190,10 +207,107 @@ struct PassCard: View {
                     }
                     Text("\(when(p.aos)) · \(Int(p.max_el_deg))°")
                         .foregroundStyle(.secondary).monospacedDigit()
-                }.font(.callout)
-            }
+                    if chevron { Image(systemName: "chevron.right")
+                        .font(.caption2).foregroundStyle(.tertiary) }
+        }.font(.callout)
+    }
+}
+
+extension PassCard where Detail == EmptyView {
+    init(title: String, passes: [API.Pass], when: @escaping (String) -> String) {
+        self.init(title: title, passes: passes, when: when, detail: nil)
+    }
+}
+
+/// Frame-by-frame view of one pass (#368). The timeline is the diagnostic:
+/// ticks only around the middle suggest a horizon problem, ticks across the
+/// whole bar a healthy chain.
+struct PassDetailView: View {
+    let observer: String
+    let pass: API.Pass
+    let when: (String) -> String
+    @State private var detail: API.PassDetail?
+    @State private var failed = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let d = detail {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(when(d.aos)) · max \(Int(d.max_el_deg))° · \(d.duration_s / 60) min")
+                            .foregroundStyle(.secondary).font(.callout)
+                        Timeline(detail: d)
+                        Text(d.frames.isEmpty
+                             ? "No frames decoded during this pass."
+                             : "\(d.frames.count) frames — position along the bar is position in the pass")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .padding().frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
+
+                    if !d.frames.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Frames").bold()
+                            ForEach(d.frames, id: \.self) { f in
+                                HStack {
+                                    Text(hms(f.ts)).monospacedDigit()
+                                    Spacer()
+                                    Text(f.fields > 0 ? "\(f.fields) fields decoded"
+                                                      : "received, not decoded")
+                                        .font(.caption)
+                                        .foregroundStyle(f.fields > 0 ? .green : .secondary)
+                                }.font(.callout)
+                            }
+                        }
+                        .padding().frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
+                    }
+                } else if failed {
+                    Unreachable(text: "Couldn't load this pass") {
+                        failed = false
+                        Task { detail = try? await API.passDetail(observer,
+                            norad: pass.norad, aos: pass.aos)
+                               if detail == nil { failed = true } }
+                    }
+                } else { ProgressView().frame(maxWidth: .infinity) }
+            }.padding()
         }
-        .padding().frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
+        .navigationTitle(pass.satellite)
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            do { detail = try await API.passDetail(observer,
+                    norad: pass.norad, aos: pass.aos) }
+            catch { failed = true }
+        }
+    }
+
+    func hms(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
+        return f.string(from: d)
+    }
+}
+
+/// The pass as a bar, one tick per frame at its offset into the window.
+struct Timeline: View {
+    let detail: API.PassDetail
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.secondary.opacity(0.25)).frame(height: 6)
+                ForEach(detail.frames, id: \.self) { f in
+                    Rectangle().fill(f.fields > 0 ? Color.green : Color.accentColor)
+                        .frame(width: 2, height: 16)
+                        .offset(x: offset(f, width: geo.size.width))
+                }
+            }.frame(maxHeight: .infinity, alignment: .center)
+        }.frame(height: 20)
+    }
+    func offset(_ f: API.Frame, width: CGFloat) -> CGFloat {
+        let iso = ISO8601DateFormatter()
+        guard let a = iso.date(from: detail.aos), let t = iso.date(from: f.ts),
+              detail.duration_s > 0 else { return 0 }
+        let x = t.timeIntervalSince(a) / Double(detail.duration_s)
+        return CGFloat(min(max(x, 0), 1)) * max(width - 2, 0)
     }
 }

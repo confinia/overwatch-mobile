@@ -51,14 +51,20 @@ private fun Screen() {
     val context = LocalContext.current
     var mine by remember { mutableStateOf(prefs(context).getString("station", "") ?: "") }
     var open by remember { mutableStateOf(mine.ifEmpty { null }) }
-    if (open == null) StationList(onPick = { open = it })
-    else StationScreen(
-        observer = open!!, mine = mine,
-        onBack = { open = null },
-        onMine = { v ->
-            mine = v
-            prefs(context).edit().putString("station", v).apply()
-        })
+    var pass by remember { mutableStateOf<Pass?>(null) }
+    when {
+        open == null -> StationList(onPick = { open = it })
+        pass != null -> PassDetailScreen(observer = open!!, pass = pass!!,
+                                         onBack = { pass = null })
+        else -> StationScreen(
+            observer = open!!, mine = mine,
+            onBack = { open = null },
+            onMine = { v ->
+                mine = v
+                prefs(context).edit().putString("station", v).apply()
+            },
+            onPass = { pass = it })
+    }
 }
 
 @Composable
@@ -94,7 +100,8 @@ private fun StationList(onPick: (String) -> Unit) {
 
 @Composable
 private fun StationScreen(observer: String, mine: String,
-                          onBack: () -> Unit, onMine: (String) -> Unit) {
+                          onBack: () -> Unit, onMine: (String) -> Unit,
+                          onPass: (Pass) -> Unit = {}) {
     var health by remember { mutableStateOf<Health?>(null) }
     var failed by remember { mutableStateOf(false) }
     LaunchedEffect(observer) {
@@ -156,7 +163,8 @@ private fun StationScreen(observer: String, mine: String,
                     }
                 }
                 if (h.passes.isNotEmpty()) PassCard("Next passes", h.passes)
-                if (h.pastPasses.isNotEmpty()) PassCard("Recent passes", h.pastPasses)
+                if (h.pastPasses.isNotEmpty())
+                    PassCard("Recent passes", h.pastPasses, onTap = onPass)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -175,14 +183,18 @@ private fun fmt(iso: String): String = try {
 /** One card of passes. Past passes carry frames: green when the station heard
  *  the pass, red "nothing heard" when it did not — the per-pass "was it me?". */
 @Composable
-private fun PassCard(title: String, passes: List<Pass>) {
+private fun PassCard(title: String, passes: List<Pass>,
+                     onTap: ((Pass) -> Unit)? = null) {
     val context = LocalContext.current
     Spacer(Modifier.height(10.dp))
     Card {
         Column(Modifier.padding(14.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold)
             passes.forEach { p ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                Row(Modifier.fillMaxWidth()
+                        .let { m -> if (onTap != null)
+                            m.clickable { onTap(p) } else m }
+                        .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     // "about" = our own control room page for that satellite
                     Text(p.satellite, color = Color(0xFF5AA9FF),
@@ -206,3 +218,89 @@ private fun PassCard(title: String, passes: List<Pass>) {
         }
     }
 }
+
+
+/** Frame-by-frame view of one pass (#368). Ticks only around the middle of
+ *  the bar suggest a horizon problem; across the whole bar, a healthy chain. */
+@Composable
+private fun PassDetailScreen(observer: String, pass: Pass, onBack: () -> Unit) {
+    var detail by remember { mutableStateOf<PassDetail?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(pass) {
+        try { detail = Api.passDetail(observer, pass.norad, pass.aos) }
+        catch (e: Exception) { failed = true }
+    }
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
+        TextButton(onClick = onBack) { Text("‹ ${observer.take(24)}") }
+        Text(pass.satellite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
+        val d = detail
+        when {
+            failed -> Text("Couldn't load this pass", color = Color(0xFFF0A35E))
+            d == null -> CircularProgressIndicator()
+            else -> {
+                Card {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("${fmt(d.aos)} · max ${d.maxEl.toInt()}° · ${d.durationS / 60} min",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(10.dp))
+                        // the timeline: one tick per frame at its offset
+                        androidx.compose.foundation.layout.BoxWithConstraints(
+                            Modifier.fillMaxWidth().height(20.dp)) {
+                            val w = maxWidth
+                            Box(Modifier.fillMaxWidth().height(6.dp)
+                                .align(Alignment.CenterStart)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.outlineVariant))
+                            d.frames.forEach { f ->
+                                val x = offsetIn(d, f)
+                                Box(Modifier.padding(start = w * x)
+                                    .width(2.dp).height(16.dp)
+                                    .align(Alignment.CenterStart)
+                                    .background(if (f.fields > 0) Color(0xFF39D98A)
+                                                else Color(0xFF5AA9FF)))
+                            }
+                        }
+                        Text(if (d.frames.isEmpty()) "No frames decoded during this pass."
+                             else "${d.frames.size} frames — position along the bar is position in the pass",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (d.frames.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Card {
+                        Column(Modifier.padding(14.dp)) {
+                            Text("Frames", fontWeight = FontWeight.SemiBold)
+                            LazyColumn {
+                                items(d.frames) { f ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                                        Text(hms(f.ts))
+                                        Spacer(Modifier.weight(1f))
+                                        Text(if (f.fields > 0) "${f.fields} fields decoded"
+                                             else "received, not decoded",
+                                            fontSize = 12.sp,
+                                            color = if (f.fields > 0) Color(0xFF39D98A)
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun offsetIn(d: PassDetail, f: Frame): Float = try {
+    val a = ZonedDateTime.parse(d.aos.replace("+00:00", "Z"))
+    val t = ZonedDateTime.parse(f.ts.replace("+00:00", "Z"))
+    val x = java.time.Duration.between(a, t).seconds.toFloat() / d.durationS
+    x.coerceIn(0f, 1f)
+} catch (e: Exception) { 0f }
+
+private fun hms(iso: String): String = try {
+    ZonedDateTime.parse(iso.replace("+00:00", "Z"))
+        .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+} catch (e: Exception) { iso }

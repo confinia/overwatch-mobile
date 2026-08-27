@@ -54,3 +54,34 @@ enum API {
         try await get("stations/\(observer)/health")
     }
 }
+
+
+extension API {
+    struct Frame: Decodable, Hashable {
+        let ts: String
+        let fields: Int
+    }
+
+    struct PassDetail: Decodable {
+        let satellite: String
+        let aos: String
+        let los: String
+        let max_el_deg: Double
+        let duration_s: Int
+        let frames: [Frame]
+    }
+
+    static func passDetail(_ observer: String, norad: Int, aos: String)
+    async throws -> PassDetail {
+        var comps = URLComponents(url: base
+            .appendingPathComponent("stations/\(observer)/pass"),
+            resolvingAgainstBaseURL: false)!
+        comps.queryItems = [.init(name: "norad", value: String(norad)),
+                            .init(name: "aos", value: aos)]
+        let (data, resp) = try await URLSession.shared.data(from: comps.url!)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(PassDetail.self, from: data)
+    }
+}
