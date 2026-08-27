@@ -1,0 +1,51 @@
+import Foundation
+
+/// Client for the Overwatch open-data API (`/api/v1`). Read-only: there is
+/// nothing to sign into — the app answers "is my station okay?" from public
+/// data, and the org/telemetry surface stays on the web where the tokens are.
+enum API {
+    static let base = URL(string: "https://overwatch.confinia.io/api/v1")!
+
+    struct Station: Decodable, Identifiable, Hashable {
+        let observer: String
+        let frames: Int
+        let satellites: Int
+        var id: String { observer }
+    }
+
+    struct Day: Decodable, Hashable {
+        let day: String
+        let frames: Int
+        let passes: Int
+        /// nil when no passes were available that day — unknown, not zero.
+        let hit_rate: Double?
+    }
+
+    struct Pass: Decodable, Hashable {
+        let satellite: String
+        let aos: String
+        let max_el_deg: Double
+    }
+
+    struct StationHealth: Decodable {
+        let observer: String
+        let days: [Day]
+        let next_passes: [Pass]
+        let recent_rate: Double?
+        let baseline_rate: Double?
+    }
+
+    private static func get<T: Decodable>(_ path: String) async throws -> T {
+        let (data, resp) = try await URLSession.shared.data(from: base.appendingPathComponent(path))
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    static func stations() async throws -> [Station] { try await get("stations") }
+
+    static func health(_ observer: String) async throws -> StationHealth {
+        try await get("stations/\(observer)/health")
+    }
+}
