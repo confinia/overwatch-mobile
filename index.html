@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Overwatch — my station</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Is my ground station okay? Reception health and next passes, from the Overwatch open-data API.">
+<meta name="theme-color" content="#0b0f16">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  /* One hand, one thumb, outdoors: big targets, dark (it's often night at the
+     antenna), nothing that needs precision. */
+  :root { --bg:#0b0f16; --card:#121a28; --line:#26314a; --text:#e8eaed;
+          --dim:#7c8aa5; --accent:#5aa9ff; --ok:#39d98a; --warn:#f0a35e;
+          --bad:#ff6b6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:16px/1.5 system-ui,-apple-system,sans-serif;
+         padding:env(safe-area-inset-top) env(safe-area-inset-right)
+                 env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  main { max-width:34rem; margin:0 auto; padding:1rem; }
+  h1 { font-size:1.15rem; margin:.4rem 0 1rem; }
+  h1 span { color:var(--accent); }
+  input[type=search] { width:100%; padding:.9rem 1rem; font:inherit;
+    border-radius:12px; border:1px solid var(--line); background:var(--card);
+    color:inherit; }
+  input[type=search]:focus-visible { outline:2px solid var(--accent); }
+  .card { background:var(--card); border:1px solid var(--line);
+          border-radius:12px; padding:.9rem 1rem; margin:.6rem 0; }
+  .hit { display:flex; justify-content:space-between; align-items:center;
+         cursor:pointer; }
+  .hit .meta, .meta { color:var(--dim); font-size:.85rem; }
+  .big { font-size:2rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  .bars { display:flex; gap:2px; align-items:flex-end; height:56px; margin:.6rem 0 .2rem; }
+  .bars div { flex:1; background:var(--accent); border-radius:2px 2px 0 0;
+              min-height:2px; opacity:.85; }
+  .bars div.na { background:var(--line); }
+  table { width:100%; border-collapse:collapse; font-size:.9rem;
+          font-variant-numeric:tabular-nums; }
+  td { padding:.45rem 0; border-bottom:1px solid var(--line); }
+  td:last-child { text-align:right; color:var(--dim); }
+  .back { color:var(--accent); text-decoration:none; font-size:.9rem;
+          display:inline-block; margin-bottom:.6rem; }
+  footer { color:var(--dim); font-size:.75rem; margin:1.4rem 0 .6rem; }
+  footer a { color:var(--accent); text-decoration:none; }
+</style></head><body><main>
+<h1><span>Overwatch</span> · my station</h1>
+<div id="view"></div>
+<footer>Open data from <a href="https://overwatch.confinia.io">overwatch.confinia.io</a>
+· we see your station only through the satellites we track — compare against
+your own history, not an absolute.</footer>
+</main><script src="app.js"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</body></html>
