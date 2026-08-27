@@ -30,7 +30,17 @@ import java.time.format.DateTimeFormatter
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { Screen() } }
+        // Surface, et pas seulement MaterialTheme : sans elle, LocalContentColor
+        // reste noir et chaque Text sans couleur explicite s'affichait noir sur
+        // le fond sombre — titres de stations illisibles, constaté en
+        // comparant à l'iPhone. Surface pose le fond du thème ET la couleur de
+        // contenu qui va avec.
+        setContent {
+            MaterialTheme(colorScheme = darkColorScheme()) {
+                Surface(Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background) { Screen() }
+            }
+        }
     }
 }
 
