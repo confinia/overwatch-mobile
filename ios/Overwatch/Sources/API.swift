@@ -22,6 +22,7 @@ enum API {
     }
 
     struct Pass: Decodable, Hashable {
+        let norad: Int
         let satellite: String
         let aos: String
         let max_el_deg: Double

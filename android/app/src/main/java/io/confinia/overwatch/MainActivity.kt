@@ -176,6 +176,7 @@ private fun fmt(iso: String): String = try {
  *  the pass, red "nothing heard" when it did not — the per-pass "was it me?". */
 @Composable
 private fun PassCard(title: String, passes: List<Pass>) {
+    val context = LocalContext.current
     Spacer(Modifier.height(10.dp))
     Card {
         Column(Modifier.padding(14.dp)) {
@@ -183,7 +184,14 @@ private fun PassCard(title: String, passes: List<Pass>) {
             passes.forEach { p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text(p.satellite)
+                    // "about" = our own control room page for that satellite
+                    Text(p.satellite, color = Color(0xFF5AA9FF),
+                        modifier = Modifier.clickable {
+                            context.startActivity(android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(
+                                    "https://overwatch.confinia.io/#${p.norad}")))
+                        })
                     Spacer(Modifier.weight(1f))
                     p.frames?.let { f ->
                         Text(if (f > 0) "$f frames" else "nothing heard",

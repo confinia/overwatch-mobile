@@ -177,7 +177,11 @@ struct PassCard: View {
             Text(title).bold()
             ForEach(passes, id: \.self) { p in
                 HStack {
-                    Text(p.satellite)
+                    // "about this satellite" = our own control room, which has
+                    // the note, dashboards and 3D view — no second data source
+                    Link(p.satellite, destination:
+                         URL(string: "https://overwatch.confinia.io/#\(p.norad)")!)
+                        .foregroundStyle(Color.accentColor)
                     Spacer()
                     if let f = p.frames {
                         Text(f > 0 ? "\(f) frames" : "nothing heard")

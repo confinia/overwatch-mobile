@@ -77,7 +77,8 @@ async function station(observer){
     const heard = p.frames == null ? ""
       : p.frames > 0 ? ` <span class="ok">${p.frames} frames</span>`
       : ` <span class="bad">nothing heard</span>`;
-    return `<tr><td>${esc(p.satellite)}${heard}</td>` +
+    return `<tr><td><a href="https://overwatch.confinia.io/#${p.norad}" ` +
+           `target="_blank" rel="noopener">${esc(p.satellite)}</a>${heard}</td>` +
            `<td>${when} · ${Math.round(p.max_el_deg)}°</td></tr>`;
   };
   const passes = d.next_passes.map(row).join("");
