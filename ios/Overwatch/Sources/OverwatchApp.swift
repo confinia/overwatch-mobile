@@ -92,22 +92,17 @@ struct StationView: View {
                     .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
 
                     if !h.next_passes.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Next passes").bold()
-                            ForEach(h.next_passes, id: \.self) { p in
-                                HStack {
-                                    Text(p.satellite)
-                                    Spacer()
-                                    Text("\(when(p.aos)) · \(Int(p.max_el_deg))°")
-                                        .foregroundStyle(.secondary).monospacedDigit()
-                                }.font(.callout)
-                            }
-                        }
-                        .padding().frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
+                        PassCard(title: "Next passes", passes: h.next_passes, when: when)
+                    }
+                    if let past = h.past_passes, !past.isEmpty {
+                        PassCard(title: "Recent passes", passes: past, when: when)
                     }
                 } else if failed {
-                    Unreachable(text: "Couldn't load \(observer)")
+                    Unreachable(text: "Couldn't load \(observer)") {
+                        failed = false
+                        Task { do { health = try await API.health(observer) }
+                               catch { failed = true } }
+                    }
                 } else { ProgressView().frame(maxWidth: .infinity) }
 
                 Text("Overwatch sees your station only through the satellites it tracks — compare against your own history, not an absolute.")
@@ -144,21 +139,57 @@ struct Bars: View {
             ForEach(days, id: \.self) { d in
                 RoundedRectangle(cornerRadius: 1)
                     .fill(d.hit_rate == nil ? Color.secondary.opacity(0.3) : Color.accentColor)
-                    .frame(height: max(3, CGFloat(d.hit_rate ?? 0) * 56))
+                    // clamped: rates above 1.0 are real (several frames per
+                    // pass — UX5UL runs ~2.5) and must not overflow the frame
+                    .frame(height: max(3, CGFloat(min(d.hit_rate ?? 0, 1.0)) * 56))
             }
         }.frame(height: 56, alignment: .bottom)
     }
 }
 
 
-/// iOS 16 stand-in for ContentUnavailableView (17+).
+/// iOS 16 stand-in for ContentUnavailableView (17+). "wifi.slash" rather than
+/// the antenna symbol: the latter is missing on some iOS 16 point releases,
+/// and SwiftUI renders a missing symbol as a bare warning triangle with no
+/// text — which is exactly the unhelpful screen this view exists to avoid.
 struct Unreachable: View {
     let text: String
+    var retry: (() -> Void)? = nil
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
+        VStack(spacing: 10) {
+            Image(systemName: "wifi.slash")
                 .font(.largeTitle).foregroundStyle(.secondary)
             Text(text).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .multilineTextAlignment(.center)
+            if let retry { Button("Try again", action: retry).buttonStyle(.bordered) }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+    }
+}
+
+/// One card of passes. Past passes carry frames: green when the station heard
+/// the pass, dim red zero when it did not — the per-pass "was it me?".
+struct PassCard: View {
+    let title: String
+    let passes: [API.Pass]
+    let when: (String) -> String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).bold()
+            ForEach(passes, id: \.self) { p in
+                HStack {
+                    Text(p.satellite)
+                    Spacer()
+                    if let f = p.frames {
+                        Text(f > 0 ? "\(f) frames" : "nothing heard")
+                            .font(.caption).monospacedDigit()
+                            .foregroundStyle(f > 0 ? .green : .red)
+                    }
+                    Text("\(when(p.aos)) · \(Int(p.max_el_deg))°")
+                        .foregroundStyle(.secondary).monospacedDigit()
+                }.font(.callout)
+            }
+        }
+        .padding().frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 14))
     }
 }

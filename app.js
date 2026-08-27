@@ -64,15 +64,24 @@ async function station(observer){
   else if (base != null && base >= 0.05 && rate <= base * 0.6){
     cls = "warn"; verdict = "below your own baseline"; }
 
+  // clamped: rates above 1.0 are real (several frames per pass) and must not
+  // overflow the row
   const bars = d.days.slice(-21).map(x =>
     x.hit_rate == null ? `<div class="na" style="height:2px"></div>`
-    : `<div style="height:${Math.max(4, Math.round(x.hit_rate * 56))}px" title="${x.day}: ${(x.hit_rate*100).toFixed(0)}%"></div>`).join("");
+    : `<div style="height:${Math.max(4, Math.round(Math.min(x.hit_rate, 1) * 56))}px" title="${x.day}: ${(x.hit_rate*100).toFixed(0)}%"></div>`).join("");
 
-  const passes = d.next_passes.map(p => {
-    const t = new Date(p.aos);
-    const when = t.toLocaleString(undefined, { weekday:"short", hour:"2-digit", minute:"2-digit" });
-    return `<tr><td>${esc(p.satellite)}</td><td>${when} · ${Math.round(p.max_el_deg)}°</td></tr>`;
-  }).join("");
+  const row = p => {
+    const when = new Date(p.aos).toLocaleString(undefined,
+      { weekday:"short", hour:"2-digit", minute:"2-digit" });
+    // past passes carry frames: the per-pass "was it me, or was it quiet?"
+    const heard = p.frames == null ? ""
+      : p.frames > 0 ? ` <span class="ok">${p.frames} frames</span>`
+      : ` <span class="bad">nothing heard</span>`;
+    return `<tr><td>${esc(p.satellite)}${heard}</td>` +
+           `<td>${when} · ${Math.round(p.max_el_deg)}°</td></tr>`;
+  };
+  const passes = d.next_passes.map(row).join("");
+  const past = (d.past_passes || []).map(row).join("");
 
   view.innerHTML =
     `<a class="back" href="#" onclick="home();return false">‹ stations</a>` +
@@ -83,7 +92,8 @@ async function station(observer){
     `<div class="bars">${bars}</div>` +
     `<div class="meta">hit rate, last ${Math.min(21, d.days.length)} days — frames heard / passes available</div></div>` +
     (passes ? `<div class="card"><b>Next passes</b><table>${passes}</table></div>`
-            : `<div class="card meta">No computed passes for this station yet — they cover the most active stations.</div>`);
+            : `<div class="card meta">No computed passes for this station yet — they cover the most active stations.</div>`) +
+    (past ? `<div class="card"><b>Recent passes</b><table>${past}</table></div>` : "");
 }
 
 function fail(e){

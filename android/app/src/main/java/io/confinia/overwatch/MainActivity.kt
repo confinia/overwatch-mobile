@@ -140,8 +140,11 @@ private fun StationScreen(observer: String, mine: String,
                             horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                             h.days.takeLast(21).forEach { d ->
                                 Box(Modifier.weight(1f)
+                                    // clamped: rates above 1.0 are real
+                                    // (several frames per pass) and must not
+                                    // overflow the row
                                     .height(if (d.hitRate == null) 3.dp
-                                            else (4 + d.hitRate * 52).dp)
+                                            else (4 + minOf(d.hitRate, 1.0) * 52).dp)
                                     .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
                                     .background(if (d.hitRate == null)
                                         MaterialTheme.colorScheme.outlineVariant
@@ -152,22 +155,8 @@ private fun StationScreen(observer: String, mine: String,
                             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (h.passes.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Card {
-                        Column(Modifier.padding(14.dp)) {
-                            Text("Next passes", fontWeight = FontWeight.SemiBold)
-                            h.passes.forEach { p ->
-                                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                    Text(p.satellite)
-                                    Spacer(Modifier.weight(1f))
-                                    Text("${fmt(p.aos)} · ${p.maxEl.toInt()}°",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
+                if (h.passes.isNotEmpty()) PassCard("Next passes", h.passes)
+                if (h.pastPasses.isNotEmpty()) PassCard("Recent passes", h.pastPasses)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -181,3 +170,31 @@ private fun fmt(iso: String): String = try {
     ZonedDateTime.parse(iso.replace("+00:00", "Z"))
         .format(DateTimeFormatter.ofPattern("EEE HH:mm"))
 } catch (e: Exception) { iso }
+
+
+/** One card of passes. Past passes carry frames: green when the station heard
+ *  the pass, red "nothing heard" when it did not — the per-pass "was it me?". */
+@Composable
+private fun PassCard(title: String, passes: List<Pass>) {
+    Spacer(Modifier.height(10.dp))
+    Card {
+        Column(Modifier.padding(14.dp)) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            passes.forEach { p ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.satellite)
+                    Spacer(Modifier.weight(1f))
+                    p.frames?.let { f ->
+                        Text(if (f > 0) "$f frames" else "nothing heard",
+                            fontSize = 12.sp,
+                            color = if (f > 0) Color(0xFF39D98A) else Color(0xFFFF6B6B))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("${fmt(p.aos)} · ${p.maxEl.toInt()}°",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}

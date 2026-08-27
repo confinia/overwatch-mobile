@@ -20,10 +20,12 @@ import java.net.URLEncoder
  */
 data class Station(val observer: String, val frames: Int, val satellites: Int)
 data class Day(val day: String, val frames: Int, val passes: Int, val hitRate: Double?)
-data class Pass(val satellite: String, val aos: String, val maxEl: Double)
+data class Pass(val satellite: String, val aos: String, val maxEl: Double,
+                /** past passes only: receptions decoded during the window */
+                val frames: Int? = null)
 data class Health(
     val observer: String, val days: List<Day>, val passes: List<Pass>,
-    val recentRate: Double?, val baselineRate: Double?,
+    val pastPasses: List<Pass>, val recentRate: Double?, val baselineRate: Double?,
 )
 
 object Api {
@@ -68,6 +70,16 @@ object Api {
                     j["satellite"]!!.jsonPrimitive.content,
                     j["aos"]!!.jsonPrimitive.content,
                     j["max_el_deg"]!!.jsonPrimitive.doubleOrNull ?: 0.0,
+                )
+            },
+            // tolerant of servers older than #366
+            pastPasses = (o["past_passes"]?.jsonArray ?: emptyList()).map { p ->
+                val j = p.jsonObject
+                Pass(
+                    j["satellite"]!!.jsonPrimitive.content,
+                    j["aos"]!!.jsonPrimitive.content,
+                    j["max_el_deg"]!!.jsonPrimitive.doubleOrNull ?: 0.0,
+                    j["frames"]?.jsonPrimitive?.intOrNull,
                 )
             },
             recentRate = o["recent_rate"]?.jsonPrimitive?.doubleOrNull,

@@ -25,12 +25,16 @@ enum API {
         let satellite: String
         let aos: String
         let max_el_deg: Double
+        /// Present only on past passes: receptions decoded during the window.
+        let frames: Int?
     }
 
     struct StationHealth: Decodable {
         let observer: String
         let days: [Day]
         let next_passes: [Pass]
+        /// Optional: servers older than #366 do not send it.
+        let past_passes: [Pass]?
         let recent_rate: Double?
         let baseline_rate: Double?
     }
