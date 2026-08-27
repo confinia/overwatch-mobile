@@ -78,6 +78,12 @@ extension API {
             resolvingAgainstBaseURL: false)!
         comps.queryItems = [.init(name: "norad", value: String(norad)),
                             .init(name: "aos", value: aos)]
+        // URLComponents leaves "+" literal in query values, and the server
+        // decodes + as a space — the aos ends in +00:00, so without this the
+        // very first pass-detail request 500d (#369). The server also
+        // tolerates the mangled form now; belt and braces.
+        comps.percentEncodedQuery = comps.percentEncodedQuery?
+            .replacingOccurrences(of: "+", with: "%2B")
         let (data, resp) = try await URLSession.shared.data(from: comps.url!)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
             throw URLError(.badServerResponse)
