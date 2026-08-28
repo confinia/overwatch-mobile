@@ -52,6 +52,7 @@ async function station(observer){
   catch (e) { return fail(e); }
   localStorage.setItem(LAST, d.observer);
   history.replaceState(null, "", `#${encodeURIComponent(d.observer)}`);
+  setTimeout(() => refreshWatchButton(d.observer), 0);
 
   const rate = d.recent_rate, base = d.baseline_rate;
   // The verdict is RELATIVE — a station that never listened to our fleet is
@@ -90,6 +91,7 @@ async function station(observer){
   view.innerHTML =
     `<a class="back" href="#" onclick="home();return false">‹ stations</a>` +
     `<div class="card"><b>${esc(d.observer)}</b>` +
+    `<button class="watch" id="watch-btn" onclick="toggleWatch('${esc(d.observer)}')">…</button>` +
     `<div class="big ${cls}">${rate == null ? "—" : (rate*100).toFixed(0) + "%"}</div>` +
     `<div class="meta">${verdict}` +
     (base != null ? ` · your baseline ${(base*100).toFixed(0)}%` : "") + `</div>` +
@@ -141,4 +143,73 @@ async function passDetail(observer, norad, aos, name){
     `<div style="position:absolute;top:5px;left:0;right:0;height:6px;background:var(--line);border-radius:3px"></div>${ticks}</div>` +
     `<div class="meta">${d.frames.length ? d.frames.length + " frames — position along the bar is position in the pass" : "No frames decoded during this pass."}</div></div>` +
     (rows ? `<div class="card"><b>Frames</b><table>${rows}</table></div>` : "");
+}
+
+
+// --- "Alert me when this station goes quiet" (#373) -------------------------
+// Real Web Push, end to end: subscribing sends an actual notification through
+// the push service within seconds, on the device that will get the alert.
+// The button hides itself when the server has no VAPID keys or the browser
+// has no push (iOS needs the app installed to the home screen first).
+async function pushState(observer){
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  try {
+    const k = await fetch(`${API}/push/key`);
+    if (!k.ok) return null;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    return { key: (await k.json()).key, reg, sub };
+  } catch (e) { return null; }
+}
+
+function subBody(sub){
+  const j = sub.toJSON();
+  return JSON.stringify({ endpoint: sub.endpoint,
+                          p256dh: j.keys.p256dh, auth: j.keys.auth });
+}
+
+async function refreshWatchButton(observer){
+  const btn = document.getElementById("watch-btn");
+  if (!btn) return;
+  const st = await pushState(observer);
+  if (!st){ btn.style.display = "none"; return; }
+  const watching = st.sub &&
+    (localStorage.getItem("ovw_watching") || "").split("|").includes(observer);
+  btn.textContent = watching ? "🔔 watching — tap to stop"
+                             : "🔕 alert me if this station goes quiet";
+  btn.dataset.watching = watching ? "1" : "";
+}
+
+async function toggleWatch(observer){
+  const btn = document.getElementById("watch-btn");
+  const st = await pushState(observer);
+  if (!st) return;
+  const list = (localStorage.getItem("ovw_watching") || "").split("|").filter(Boolean);
+  try {
+    if (btn.dataset.watching){
+      if (st.sub)
+        await fetch(`${API}/stations/${encodeURIComponent(observer)}/watch`,
+          { method: "DELETE", headers: { "content-type": "application/json" },
+            body: subBody(st.sub) });
+      localStorage.setItem("ovw_watching",
+        list.filter(o => o !== observer).join("|"));
+    } else {
+      const sub = st.sub || await st.reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64(st.key) });
+      const r = await fetch(`${API}/stations/${encodeURIComponent(observer)}/watch`,
+        { method: "POST", headers: { "content-type": "application/json" },
+          body: subBody(sub) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!list.includes(observer)) list.push(observer);
+      localStorage.setItem("ovw_watching", list.join("|"));
+    }
+  } catch (e) { alert("Couldn't update the alert: " + e.message); }
+  refreshWatchButton(observer);
+}
+
+function urlB64(s){
+  const pad = "=".repeat((4 - s.length % 4) % 4);
+  const raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
 }
