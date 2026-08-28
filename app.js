@@ -260,8 +260,16 @@ async function frameView(norad, satName, ts, observer, aos){
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     d = await r.json();
   } catch (e) { return fail(e); }
+  // Same rule as the Grafana boards (#248): a kaitai path like
+  // ax25_frame_payload_..._primary_header_sequence_count is identified by its
+  // TAIL, so show the last segments and keep the full name as a tooltip.
+  const short = n => {
+    if (n.length <= 40) return esc(n);
+    const tail = n.split("_").slice(-4).join("_");
+    return `<span title="${esc(n)}">…${esc(tail)}</span>`;
+  };
   const rows = d.fields.map(f =>
-    `<tr><td>${esc(f.field)}</td><td>${
+    `<tr><td>${short(f.field)}</td><td>${
       typeof f.value === "number" ? +f.value.toFixed(4) : esc(String(f.value))
     }</td></tr>`).join("");
   view.innerHTML =
