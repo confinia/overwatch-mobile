@@ -54,5 +54,20 @@
 your own history, not an absolute.</footer>
 </main><script src="app.js"></script>
 <script>document.getElementById("build").textContent = BUILD;</script>
-<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+<script>
+// Self-updating shell: check for a new service worker on every open, and when
+// one takes over, reload once so the user is never stuck on a stale build —
+// "close it twice and hope" is not an update mechanism (learned on v9->v10,
+// where the fix for a navigation trap sat published while the trapped shell
+// kept serving itself).
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").then(r => r.update());
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloaded) return;          // never loop
+    reloaded = true;
+    location.reload();
+  });
+}
+</script>
 </body></html>
