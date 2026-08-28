@@ -53,10 +53,16 @@ private fun Screen() {
     var mine by remember { mutableStateOf(prefs(context).getString("station", "") ?: "") }
     var open by remember { mutableStateOf(mine.ifEmpty { null }) }
     var pass by remember { mutableStateOf<Pass?>(null) }
+    var frame by remember { mutableStateOf<Frame?>(null) }
+    var sat by remember { mutableStateOf<Pass?>(null) }
     when {
         open == null -> StationList(onPick = { open = it })
+        frame != null -> FrameScreen(pass = pass, frame = frame!!,
+                                     onBack = { frame = null })
+        sat != null -> SatScreen(p = sat!!, onBack = { sat = null })
         pass != null -> PassDetailScreen(observer = open!!, pass = pass!!,
-                                         onBack = { pass = null })
+                                         onBack = { pass = null },
+                                         onFrame = { frame = it })
         else -> StationScreen(
             observer = open!!, mine = mine,
             onBack = { open = null },
@@ -64,7 +70,8 @@ private fun Screen() {
                 mine = v
                 prefs(context).edit().putString("station", v).apply()
             },
-            onPass = { pass = it })
+            onPass = { pass = it },
+            onSat = { sat = it })
     }
 }
 
@@ -102,7 +109,8 @@ private fun StationList(onPick: (String) -> Unit) {
 @Composable
 private fun StationScreen(observer: String, mine: String,
                           onBack: () -> Unit, onMine: (String) -> Unit,
-                          onPass: (Pass) -> Unit = {}) {
+                          onPass: (Pass) -> Unit = {},
+                          onSat: (Pass) -> Unit = {}) {
     var health by remember { mutableStateOf<Health?>(null) }
     var failed by remember { mutableStateOf(false) }
     LaunchedEffect(observer) {
@@ -166,9 +174,11 @@ private fun StationScreen(observer: String, mine: String,
                             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                if (h.passes.isNotEmpty()) PassCard("Next passes", h.passes)
+                if (h.passes.isNotEmpty())
+                    PassCard("Next passes", h.passes, onSat = onSat)
                 if (h.pastPasses.isNotEmpty())
-                    PassCard("Recent passes", h.pastPasses, onTap = onPass)
+                    PassCard("Recent passes", h.pastPasses, onTap = onPass,
+                             onSat = onSat)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -188,8 +198,8 @@ private fun fmt(iso: String): String = try {
  *  the pass, red "nothing heard" when it did not — the per-pass "was it me?". */
 @Composable
 private fun PassCard(title: String, passes: List<Pass>,
-                     onTap: ((Pass) -> Unit)? = null) {
-    val context = LocalContext.current
+                     onTap: ((Pass) -> Unit)? = null,
+                     onSat: ((Pass) -> Unit)? = null) {
     Spacer(Modifier.height(10.dp))
     Card {
         Column(Modifier.padding(14.dp)) {
@@ -200,14 +210,10 @@ private fun PassCard(title: String, passes: List<Pass>,
                             m.clickable { onTap(p) } else m }
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    // "about" = our own control room page for that satellite
+                    // in-app card, not the browser: the control room is a
+                    // desk tool
                     Text(p.satellite, color = Color(0xFF5AA9FF),
-                        modifier = Modifier.clickable {
-                            context.startActivity(android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse(
-                                    "https://overwatch.confinia.io/#${p.norad}")))
-                        })
+                        modifier = Modifier.clickable { onSat?.invoke(p) })
                     Spacer(Modifier.weight(1f))
                     p.frames?.let { f ->
                         Text(if (f > 0) "$f frames" else "nothing heard",
@@ -227,7 +233,8 @@ private fun PassCard(title: String, passes: List<Pass>,
 /** Frame-by-frame view of one pass (#368). Ticks only around the middle of
  *  the bar suggest a horizon problem; across the whole bar, a healthy chain. */
 @Composable
-private fun PassDetailScreen(observer: String, pass: Pass, onBack: () -> Unit) {
+private fun PassDetailScreen(observer: String, pass: Pass, onBack: () -> Unit,
+                             onFrame: (Frame) -> Unit = {}) {
     var detail by remember { mutableStateOf<PassDetail?>(null) }
     var failed by remember { mutableStateOf(false) }
     LaunchedEffect(pass) {
@@ -280,7 +287,10 @@ private fun PassDetailScreen(observer: String, pass: Pass, onBack: () -> Unit) {
                             // plain Column: a LazyColumn inside a scrollable
                             // parent crashes with unbounded-height measurement
                             d.frames.forEach { f ->
-                                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                                Row(Modifier.fillMaxWidth()
+                                        .let { m -> if (f.fields > 0)
+                                            m.clickable { onFrame(f) } else m }
+                                        .padding(vertical = 3.dp)) {
                                     Text(hms(f.ts))
                                     Spacer(Modifier.weight(1f))
                                     Text(if (f.fields > 0) "${f.fields} fields decoded"
@@ -309,3 +319,101 @@ private fun hms(iso: String): String = try {
     ZonedDateTime.parse(iso.replace("+00:00", "Z"))
         .format(DateTimeFormatter.ofPattern("HH:mm:ss"))
 } catch (e: Exception) { iso }
+
+
+/** Every decoded value of one frame — "did it decode SANELY". */
+@Composable
+private fun FrameScreen(pass: Pass?, frame: Frame, onBack: () -> Unit) {
+    var detail by remember { mutableStateOf<FrameDetail?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(frame) {
+        try { detail = Api.frameFields(pass?.norad ?: 0, frame.ts) }
+        catch (e: Exception) { failed = true }
+    }
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+        TextButton(onClick = onBack) { Text("‹ pass") }
+        Text(pass?.satellite ?: "", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("frame · ${hms(frame.ts)}", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(10.dp))
+        val d = detail
+        when {
+            failed -> Text("Couldn't load this frame", color = Color(0xFFF0A35E))
+            d == null -> CircularProgressIndicator()
+            else -> Card {
+                Column(Modifier.padding(14.dp)) {
+                    d.fields.forEach { f ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                            // #248 rule: a 90-char kaitai path is identified
+                            // by its tail
+                            Text(if (f.field.length > 40)
+                                     "…" + f.field.split("_").takeLast(4)
+                                         .joinToString("_")
+                                 else f.field,
+                                fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Text(f.display, fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Light in-app satellite card; the heavy control room stays one link away. */
+@Composable
+private fun SatScreen(p: Pass, onBack: () -> Unit) {
+    val context = LocalContext.current
+    var sat by remember { mutableStateOf<Sat?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(p) {
+        try { sat = Api.satellite(p.norad); if (sat == null) failed = true }
+        catch (e: Exception) { failed = true }
+    }
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+        TextButton(onClick = onBack) { Text("‹ back") }
+        Text(p.satellite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
+        val s = sat
+        when {
+            failed -> Text("Couldn't load ${p.satellite}", color = Color(0xFFF0A35E))
+            s == null -> CircularProgressIndicator()
+            else -> Card {
+                Column(Modifier.padding(14.dp)) {
+                    s.note?.let { Text(it, fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp)) }
+                    satRow("Altitude", s.altKm?.let { "${it.toInt()} km" } ?: "—")
+                    satRow("Position", if (s.lat != null && s.lon != null)
+                        String.format("%.1f°, %.1f°", s.lat, s.lon) else "—")
+                    satRow("Sunlight", if (s.sunlit) "☀ sunlit" else "🌑 in eclipse")
+                    satRow("Last heard", s.lastFrame?.let { fmt(it) }
+                        ?: "never (position only)")
+                    satRow("Telemetry", if (s.telemetry) "decoded here"
+                                        else "position only")
+                    Spacer(Modifier.height(8.dp))
+                    Text("Open in the full control room ↗",
+                        color = Color(0xFF5AA9FF), fontSize = 13.sp,
+                        modifier = Modifier.clickable {
+                            context.startActivity(android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(
+                                    "https://overwatch.confinia.io/#${p.norad}")))
+                        })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun satRow(k: String, v: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(k, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(v, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

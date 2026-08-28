@@ -194,11 +194,13 @@ struct PassCard<Detail: View>: View {
     }
     func rowBody(_ p: API.Pass, chevron: Bool) -> some View {
         HStack {
-                    // "about this satellite" = our own control room, which has
-                    // the note, dashboards and 3D view — no second data source
-                    Link(p.satellite, destination:
-                         URL(string: "https://overwatch.confinia.io/#\(p.norad)")!)
-                        .foregroundStyle(Color.accentColor)
+                    // in-app card, not Safari: the control room is a desk
+                    // tool, and the card answers "what is this?" in one screen
+                    NavigationLink { SatCardView(norad: p.norad,
+                                                 satName: p.satellite) }
+                        label: { Text(p.satellite)
+                            .foregroundStyle(Color.accentColor) }
+                        .buttonStyle(.plain)
                     Spacer()
                     if let f = p.frames {
                         Text(f > 0 ? "\(f) frames" : "nothing heard")
@@ -249,14 +251,14 @@ struct PassDetailView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Frames").bold()
                             ForEach(d.frames, id: \.self) { f in
-                                HStack {
-                                    Text(hms(f.ts)).monospacedDigit()
-                                    Spacer()
-                                    Text(f.fields > 0 ? "\(f.fields) fields decoded"
-                                                      : "received, not decoded")
-                                        .font(.caption)
-                                        .foregroundStyle(f.fields > 0 ? .green : .secondary)
-                                }.font(.callout)
+                                if f.fields > 0 {
+                                    NavigationLink {
+                                        FrameFieldsView(norad: pass.norad,
+                                                        satName: pass.satellite,
+                                                        ts: f.ts)
+                                    } label: { frameRow(f, link: true) }
+                                    .buttonStyle(.plain)
+                                } else { frameRow(f, link: false) }
                             }
                         }
                         .padding().frame(maxWidth: .infinity, alignment: .leading)
@@ -284,6 +286,116 @@ struct PassDetailView: View {
     func hms(_ iso: String) -> String {
         guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
+        return f.string(from: d)
+    }
+
+    func frameRow(_ f: API.Frame, link: Bool) -> some View {
+        HStack {
+            Text(hms(f.ts)).monospacedDigit()
+            Spacer()
+            Text(f.fields > 0 ? "\(f.fields) fields decoded"
+                              : "received, not decoded")
+                .font(.caption)
+                .foregroundStyle(f.fields > 0 ? .green : .secondary)
+            if link { Image(systemName: "chevron.right")
+                .font(.caption2).foregroundStyle(.tertiary) }
+        }.font(.callout)
+    }
+}
+
+/// The deepest level: every decoded value of one frame. The question at this
+/// depth is "did it decode SANELY" — 0.02 V tells a different story than a
+/// missing frame.
+struct FrameFieldsView: View {
+    let norad: Int
+    let satName: String
+    let ts: String
+    @State private var detail: API.FrameDetail?
+    @State private var failed = false
+
+    var body: some View {
+        List {
+            if let d = detail {
+                ForEach(d.fields, id: \.self) { f in
+                    HStack(alignment: .firstTextBaseline) {
+                        // #248 rule: a 90-char kaitai path is identified by
+                        // its tail
+                        Text(f.field.count > 40
+                             ? "…" + f.field.split(separator: "_").suffix(4)
+                                   .joined(separator: "_")
+                             : f.field)
+                            .font(.callout)
+                        Spacer()
+                        Text(f.value.display)
+                            .font(.callout).monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if failed {
+                Unreachable(text: "Couldn't load this frame") {
+                    failed = false
+                    Task { detail = try? await API.frame(norad, ts: ts)
+                           if detail == nil { failed = true } }
+                }
+            } else { ProgressView() }
+        }
+        .navigationTitle(satName)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { do { detail = try await API.frame(norad, ts: ts) }
+                catch { failed = true } }
+    }
+}
+
+/// Light in-app satellite card — the full control room (MapLibre + Grafana,
+/// tens of MB) stays one explicit link away instead of being the only door.
+struct SatCardView: View {
+    let norad: Int
+    let satName: String
+    @State private var sat: API.Satellite?
+    @State private var failed = false
+
+    var body: some View {
+        List {
+            if let s = sat {
+                if let note = s.note, !note.isEmpty {
+                    Text(note).font(.callout).foregroundStyle(.secondary)
+                }
+                row("Altitude", s.alt_km.map { "\(Int($0)) km" } ?? "—")
+                row("Position", (s.lat != nil && s.lon != nil)
+                    ? String(format: "%.1f°, %.1f°", s.lat!, s.lon!) : "—")
+                row("Sunlight", (s.sunlit ?? false) ? "☀ sunlit" : "🌑 in eclipse")
+                row("Last heard", s.last_frame.map(when) ?? "never (position only)")
+                row("Telemetry", s.has_telemetry ? "decoded here" : "position only")
+                Link(destination:
+                     URL(string: "https://overwatch.confinia.io/#\(norad)")!) {
+                    Text("Open in the full control room ↗").font(.callout)
+                }
+            } else if failed {
+                Unreachable(text: "Couldn't load \(satName)") {
+                    failed = false
+                    Task { await load() }
+                }
+            } else { ProgressView() }
+        }
+        .navigationTitle(satName)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    func load() async {
+        do { sat = try await API.satellites().first { $0.norad == norad }
+             if sat == nil { failed = true } }
+        catch { failed = true }
+    }
+
+    func row(_ k: String, _ v: String) -> some View {
+        HStack { Text(k); Spacer()
+                 Text(v).foregroundStyle(.secondary) }.font(.callout)
+    }
+
+    func when(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }
+        let f = DateFormatter(); f.dateFormat = "d MMM HH:mm"
         return f.string(from: d)
     }
 }

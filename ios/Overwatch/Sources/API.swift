@@ -91,3 +91,64 @@ extension API {
         return try JSONDecoder().decode(PassDetail.self, from: data)
     }
 }
+
+
+extension API {
+    struct FrameField: Decodable, Hashable {
+        let field: String
+        let value: JSONValue
+    }
+
+    /// A decoded value is a number or a string ("NOMINAL"); decode either.
+    enum JSONValue: Decodable, Hashable {
+        case num(Double), text(String)
+        init(from d: Decoder) throws {
+            let c = try d.singleValueContainer()
+            if let n = try? c.decode(Double.self) { self = .num(n) }
+            else { self = .text((try? c.decode(String.self)) ?? "—") }
+        }
+        var display: String {
+            switch self {
+            case .num(let n): return n == n.rounded() ? String(Int(n))
+                                                      : String(format: "%.4g", n)
+            case .text(let t): return t
+            }
+        }
+    }
+
+    struct FrameDetail: Decodable {
+        let satellite: String
+        let ts: String
+        let fields: [FrameField]
+    }
+
+    static func frame(_ norad: Int, ts: String) async throws -> FrameDetail {
+        var comps = URLComponents(url: base
+            .appendingPathComponent("satellites/\(norad)/frame"),
+            resolvingAgainstBaseURL: false)!
+        comps.queryItems = [.init(name: "ts", value: ts)]
+        comps.percentEncodedQuery = comps.percentEncodedQuery?
+            .replacingOccurrences(of: "+", with: "%2B")     // the #369 lesson
+        let (data, resp) = try await URLSession.shared.data(from: comps.url!)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(FrameDetail.self, from: data)
+    }
+
+    struct Satellite: Decodable, Hashable {
+        let norad: Int
+        let name: String
+        let has_telemetry: Bool
+        let note: String?
+        let lat: Double?
+        let lon: Double?
+        let alt_km: Double?
+        let sunlit: Bool?
+        let last_frame: String?
+    }
+
+    static func satellites() async throws -> [Satellite] {
+        try await get("satellites")
+    }
+}

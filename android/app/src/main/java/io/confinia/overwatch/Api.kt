@@ -114,3 +114,44 @@ suspend fun Api.passDetail(observer: String, norad: Int, aos: String): PassDetai
                   j["fields"]!!.jsonPrimitive.intOrNull ?: 0)
         })
 }
+
+
+data class FrameField(val field: String, val display: String)
+data class FrameDetail(val satellite: String, val ts: String,
+                       val fields: List<FrameField>)
+
+suspend fun Api.frameFields(norad: Int, ts: String): FrameDetail {
+    val o = Json.parseToJsonElement(
+        rawGet("satellites/$norad/frame?ts=${URLEncoder.encode(ts, "UTF-8")}")).jsonObject
+    return FrameDetail(
+        satellite = o["satellite"]!!.jsonPrimitive.content,
+        ts = o["ts"]!!.jsonPrimitive.content,
+        fields = o["fields"]!!.jsonArray.map { f ->
+            val j = f.jsonObject
+            val p = j["value"]!!.jsonPrimitive
+            val d = p.doubleOrNull
+            FrameField(j["field"]!!.jsonPrimitive.content,
+                if (d == null) p.content
+                else if (d == Math.floor(d)) d.toLong().toString()
+                else String.format("%.4g", d))
+        })
+}
+
+data class Sat(val norad: Int, val name: String, val note: String?,
+               val altKm: Double?, val lat: Double?, val lon: Double?,
+               val sunlit: Boolean, val lastFrame: String?, val telemetry: Boolean)
+
+suspend fun Api.satellite(norad: Int): Sat? =
+    Json.parseToJsonElement(rawGet("satellites")).jsonArray
+        .map { it.jsonObject }
+        .firstOrNull { it["norad"]!!.jsonPrimitive.intOrNull == norad }
+        ?.let { o ->
+            Sat(norad, o["name"]!!.jsonPrimitive.content,
+                o["note"]?.jsonPrimitive?.contentOrNull,
+                o["alt_km"]?.jsonPrimitive?.doubleOrNull,
+                o["lat"]?.jsonPrimitive?.doubleOrNull,
+                o["lon"]?.jsonPrimitive?.doubleOrNull,
+                o["sunlit"]?.jsonPrimitive?.content == "true",
+                o["last_frame"]?.jsonPrimitive?.contentOrNull,
+                o["has_telemetry"]?.jsonPrimitive?.content == "true")
+        }
