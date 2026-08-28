@@ -81,8 +81,8 @@ async function station(observer){
     const heard = p.frames == null ? ""
       : p.frames > 0 ? ` <span class="ok">${p.frames} frames</span>`
       : ` <span class="bad">nothing heard</span>`;
-    return `<tr${open}><td><a href="https://overwatch.confinia.io/#${p.norad}" ` +
-           `target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(p.satellite)}</a>${heard}</td>` +
+    return `<tr${open}><td><a href="#" onclick="event.stopPropagation();` +
+           `satCard(${p.norad},'${esc(d.observer)}');return false">${esc(p.satellite)}</a>${heard}</td>` +
            `<td>${when} · ${Math.round(p.max_el_deg)}°${p.frames == null ? "" : " ›"}</td></tr>`;
   };
   const passes = d.next_passes.map(row).join("");
@@ -212,4 +212,37 @@ function urlB64(s){
   const pad = "=".repeat((4 - s.length % 4) % 4);
   const raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+
+/** In-app satellite card: the light answer to "what is this?". The full
+ *  control room (MapLibre + Grafana, tens of MB) stays one explicit link
+ *  away instead of being the only door — on the connections our users
+ *  actually have, that page is a desk tool, not a pocket one. */
+async function satCard(norad, backTo){
+  view.innerHTML = `<div class="card meta">Loading…</div>`;
+  let sat;
+  try {
+    const r = await fetch(`${API}/satellites`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    sat = (await r.json()).find(x => x.norad === norad);
+    if (!sat) throw new Error("not in the tracked fleet");
+  } catch (e) { return fail(e); }
+  const heard = sat.last_frame
+    ? new Date(sat.last_frame).toLocaleString() : "never (position only)";
+  view.innerHTML =
+    `<a class="back" href="#" onclick="station('${esc(backTo)}');return false">‹ ${esc(backTo)}</a>` +
+    `<div class="card"><b>${esc(sat.name)}</b> <span class="meta">NORAD ${sat.norad}</span>` +
+    (sat.note ? `<div class="meta" style="margin:.4rem 0">${esc(sat.note)}</div>` : "") +
+    `<table>` +
+    `<tr><td>Altitude</td><td>${Math.round(sat.alt_km)} km</td></tr>` +
+    `<tr><td>Position</td><td>${sat.lat.toFixed(1)}°, ${sat.lon.toFixed(1)}°</td></tr>` +
+    `<tr><td>Sunlight</td><td>${sat.sunlit ? "☀ sunlit" : "🌑 in eclipse"}</td></tr>` +
+    `<tr><td>Last heard</td><td>${heard}</td></tr>` +
+    `<tr><td>Telemetry</td><td>${sat.has_telemetry ? "decoded here" : "position only"}</td></tr>` +
+    `</table>` +
+    `<div class="meta" style="margin-top:.7rem">` +
+    `<a href="https://overwatch.confinia.io/#${norad}" target="_blank" rel="noopener">` +
+    `open in the full control room ↗</a> <span class="meta">(heavy — globe and dashboards)</span></div>` +
+    `</div>`;
 }
