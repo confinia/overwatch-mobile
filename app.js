@@ -5,7 +5,7 @@ const API = "https://overwatch.confinia.io/api/v1";
 // with the service-worker shell on every deploy. Shown in the footer, so
 // "PWA or native?" and "old shell or new?" are answered by looking, not
 // guessing — the confusion cost real debugging time.
-const BUILD = "PWA · shell v9";
+const BUILD = "PWA · shell v10";
 const view = document.getElementById("view");
 const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
 
@@ -19,7 +19,7 @@ async function j(path){
   return r.json();
 }
 
-function home(){
+function home(explicit){
   history.replaceState(null, "", "#");
   view.innerHTML =
     `<input type="search" id="q" placeholder="Your callsign or station name…" autocomplete="off">` +
@@ -28,8 +28,12 @@ function home(){
   q.addEventListener("input", debounce(search, 250));
   q.focus();
   const last = localStorage.getItem(LAST);
-  if (last) station(last);        // returning user: straight to their station
-  else search();                  // first visit: show the busiest stations
+  // The open-my-station shortcut applies ONLY at launch. It used to run here
+  // unconditionally, so tapping "‹ stations" rendered the list and instantly
+  // bounced back to the remembered station — once one was saved, the list
+  // was unreachable forever.
+  if (last && !explicit) station(last);
+  else search();
 }
 
 let seq = 0;
@@ -94,7 +98,7 @@ async function station(observer){
   const past = (d.past_passes || []).map(row).join("");
 
   view.innerHTML =
-    `<a class="back" href="#" onclick="home();return false">‹ stations</a>` +
+    `<a class="back" href="#" onclick="home(true);return false">‹ stations</a>` +
     `<div class="card"><b>${esc(d.observer)}</b>` +
     `<button class="watch" id="watch-btn" onclick="toggleWatch('${esc(d.observer)}')">…</button>` +
     `<div class="big ${cls}">${rate == null ? "—" : (rate*100).toFixed(0) + "%"}</div>` +
@@ -108,7 +112,7 @@ async function station(observer){
 }
 
 function fail(e){
-  view.innerHTML = `<a class="back" href="#" onclick="home();return false">‹ stations</a>` +
+  view.innerHTML = `<a class="back" href="#" onclick="home(true);return false">‹ stations</a>` +
     `<div class="card"><b>Couldn't load that</b><div class="meta">${esc(e.message)}</div></div>`;
 }
 
