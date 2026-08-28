@@ -1,6 +1,11 @@
 // Overwatch mobile — one question, answered fast: "is my station okay?"
 // Reads only open-data GET endpoints; there is nothing to sign into.
 const API = "https://overwatch.confinia.io/api/v1";
+// Surface identity (dev key tool): which build am I actually running? Bumped
+// with the service-worker shell on every deploy. Shown in the footer, so
+// "PWA or native?" and "old shell or new?" are answered by looking, not
+// guessing — the confusion cost real debugging time.
+const BUILD = "PWA · shell v9";
 const view = document.getElementById("view");
 const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
 

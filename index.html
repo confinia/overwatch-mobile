@@ -49,9 +49,10 @@
 </style></head><body><main>
 <h1><span>Overwatch</span> · my station</h1>
 <div id="view"></div>
-<footer>Open data from <a href="https://overwatch.confinia.io">overwatch.confinia.io</a>
+<footer><span id="build"></span> · Open data from <a href="https://overwatch.confinia.io">overwatch.confinia.io</a>
 · we see your station only through the satellites we track — compare against
 your own history, not an absolute.</footer>
 </main><script src="app.js"></script>
+<script>document.getElementById("build").textContent = BUILD;</script>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 </body></html>
