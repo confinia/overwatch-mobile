@@ -132,8 +132,9 @@ async function passDetail(observer, norad, aos, name){
            `background:${f.fields > 0 ? "var(--ok)" : "var(--accent)"}"></div>`;
   }).join("");
   const rows = d.frames.map(f =>
-    `<tr><td>${new Date(f.ts).toLocaleTimeString()}</td>` +
-    `<td>${f.fields > 0 ? `<span class="ok">${f.fields} fields decoded</span>`
+    `<tr${f.fields > 0 ? ` onclick="frameView(${norad},'${esc(name)}','${f.ts}','${esc(observer)}','${aos}')" style="cursor:pointer"` : ""}>` +
+    `<td>${new Date(f.ts).toLocaleTimeString()}</td>` +
+    `<td>${f.fields > 0 ? `<span class="ok">${f.fields} fields decoded ›</span>`
                         : `<span class="meta">received, not decoded</span>`}</td></tr>`).join("");
   view.innerHTML =
     `<a class="back" href="#" onclick="station('${esc(observer)}');return false">‹ ${esc(observer)}</a>` +
@@ -245,4 +246,26 @@ async function satCard(norad, backTo){
     `<a href="https://overwatch.confinia.io/#${norad}" target="_blank" rel="noopener">` +
     `open in the full control room ↗</a> <span class="meta">(heavy — globe and dashboards)</span></div>` +
     `</div>`;
+}
+
+
+/** The deepest level: every decoded field of one frame. The question at this
+ *  depth is "did it decode SANELY" — a battery at 0.02 V tells a different
+ *  story than a missing frame. */
+async function frameView(norad, satName, ts, observer, aos){
+  view.innerHTML = `<div class="card meta">Loading frame…</div>`;
+  let d;
+  try {
+    const r = await fetch(`${API}/satellites/${norad}/frame?ts=${encodeURIComponent(ts)}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    d = await r.json();
+  } catch (e) { return fail(e); }
+  const rows = d.fields.map(f =>
+    `<tr><td>${esc(f.field)}</td><td>${
+      typeof f.value === "number" ? +f.value.toFixed(4) : esc(String(f.value))
+    }</td></tr>`).join("");
+  view.innerHTML =
+    `<a class="back" href="#" onclick="passDetail('${esc(observer)}',${norad},'${aos}','${esc(satName)}');return false">‹ pass</a>` +
+    `<div class="card"><b>${esc(satName)}</b> <span class="meta">frame · ${new Date(d.ts).toLocaleTimeString()}</span>` +
+    `<table>${rows}</table></div>`;
 }
