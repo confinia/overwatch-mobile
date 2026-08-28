@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -107,7 +108,10 @@ private fun StationScreen(observer: String, mine: String,
     LaunchedEffect(observer) {
         try { health = Api.health(observer) } catch (e: Exception) { failed = true }
     }
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)
+            // the screen grew past one screenful (passes, recent passes) and
+            // a bare Column silently clips everything below the fold
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("‹ stations") }
             Spacer(Modifier.weight(1f))
@@ -167,7 +171,7 @@ private fun StationScreen(observer: String, mine: String,
                     PassCard("Recent passes", h.pastPasses, onTap = onPass)
             }
         }
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(14.dp))
         Text("Overwatch sees your station only through the satellites it tracks — " +
              "compare against your own history, not an absolute.",
             fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -230,7 +234,8 @@ private fun PassDetailScreen(observer: String, pass: Pass, onBack: () -> Unit) {
         try { detail = Api.passDetail(observer, pass.norad, pass.aos) }
         catch (e: Exception) { failed = true }
     }
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())) {
         TextButton(onClick = onBack) { Text("‹ ${observer.take(24)}") }
         Text(pass.satellite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
@@ -272,17 +277,17 @@ private fun PassDetailScreen(observer: String, pass: Pass, onBack: () -> Unit) {
                     Card {
                         Column(Modifier.padding(14.dp)) {
                             Text("Frames", fontWeight = FontWeight.SemiBold)
-                            LazyColumn {
-                                items(d.frames) { f ->
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                                        Text(hms(f.ts))
-                                        Spacer(Modifier.weight(1f))
-                                        Text(if (f.fields > 0) "${f.fields} fields decoded"
-                                             else "received, not decoded",
-                                            fontSize = 12.sp,
-                                            color = if (f.fields > 0) Color(0xFF39D98A)
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                            // plain Column: a LazyColumn inside a scrollable
+                            // parent crashes with unbounded-height measurement
+                            d.frames.forEach { f ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                                    Text(hms(f.ts))
+                                    Spacer(Modifier.weight(1f))
+                                    Text(if (f.fields > 0) "${f.fields} fields decoded"
+                                         else "received, not decoded",
+                                        fontSize = 12.sp,
+                                        color = if (f.fields > 0) Color(0xFF39D98A)
+                                                else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
