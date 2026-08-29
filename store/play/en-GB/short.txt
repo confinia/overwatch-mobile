@@ -1,0 +1,1 @@
+Is my ground station okay? Reception health, pass detail, decoded frames.

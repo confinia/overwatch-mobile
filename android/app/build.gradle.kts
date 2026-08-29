@@ -1,3 +1,4 @@
+import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,10 +18,30 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    // Play upload signing. The keystore and its password live OUTSIDE the
+    // repo (~/.android-keys/, chmod 600) and are referenced via
+    // local.properties — losing that keystore means losing the ability to
+    // update the app, so it is backed up like a production secret, never
+    // committed like one.
+    val localProps = Properties()
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { localProps.load(it) }
+    val uploadKs: String? = localProps.getProperty("uploadKeystore")
+    signingConfigs {
+        create("upload") {
+            if (uploadKs != null) {
+                storeFile = file(uploadKs)
+                storePassword = localProps.getProperty("uploadPassword")
+                keyAlias = "overwatch"
+                keyPassword = localProps.getProperty("uploadPassword")
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (uploadKs != null) signingConfigs.getByName("upload")
+                            else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
