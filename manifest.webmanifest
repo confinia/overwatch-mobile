@@ -1,6 +1,6 @@
 {
-  "name": "Overwatch — my station",
-  "short_name": "Overwatch",
+  "name": "Overwatch-dev",
+  "short_name": "Overwatch-dev",
   "description": "Is my ground station okay? Reception health and next passes.",
   "start_url": "./",
   "scope": "./",
