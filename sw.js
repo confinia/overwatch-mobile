@@ -1,6 +1,6 @@
 // Cache the SHELL, never the data. A stale hit-rate that looks fresh is worse
 // than a spinner: this app exists to answer "is my station okay RIGHT NOW".
-const SHELL = "ovw-shell-v12";
+const SHELL = "ovw-shell-v13";
 const ASSETS = ["./", "index.html", "app.js", "manifest.webmanifest", "icon.svg"];
 self.addEventListener("install", e =>
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())));

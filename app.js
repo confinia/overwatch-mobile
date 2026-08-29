@@ -74,11 +74,16 @@ async function station(observer){
   else if (base != null && base >= 0.05 && rate <= base * 0.6){
     cls = "warn"; verdict = "below your own baseline"; }
 
-  // clamped: rates above 1.0 are real (several frames per pass) and must not
-  // overflow the row
-  const bars = d.days.slice(-21).map(x =>
+  // A ratio, not a percentage: several frames arrive per pass, so the value
+  // sits naturally above 1 — shown as "293%" it read as nonsense ("293% of
+  // what?", mhuebner, 2026-08-29). Bars scale against the window's own peak
+  // so the shape survives whatever the station's absolute rate is.
+  const fpp = r => r >= 10 ? r.toFixed(0) : r.toFixed(1);
+  const win = d.days.slice(-21);
+  const peak = Math.max(1, ...win.map(x => x.hit_rate ?? 0));
+  const bars = win.map(x =>
     x.hit_rate == null ? `<div class="na" style="height:2px"></div>`
-    : `<div style="height:${Math.max(4, Math.round(Math.min(x.hit_rate, 1) * 56))}px" title="${x.day}: ${(x.hit_rate*100).toFixed(0)}%"></div>`).join("");
+    : `<div style="height:${Math.max(4, Math.round(x.hit_rate / peak * 56))}px" title="${x.day}: ${fpp(x.hit_rate)} frames per pass"></div>`).join("");
 
   const row = p => {
     // past passes drill into the frame-by-frame view (#368)
@@ -101,11 +106,11 @@ async function station(observer){
     `<a class="back" href="#" onclick="home(true);return false">‹ stations</a>` +
     `<div class="card"><b>${esc(d.observer)}</b>` +
     `<button class="watch" id="watch-btn" onclick="toggleWatch('${esc(d.observer)}')">…</button>` +
-    `<div class="big ${cls}">${rate == null ? "—" : (rate*100).toFixed(0) + "%"}</div>` +
-    `<div class="meta">${verdict}` +
-    (base != null ? ` · your baseline ${(base*100).toFixed(0)}%` : "") + `</div>` +
+    `<div class="big ${cls}">${rate == null ? "—" : fpp(rate)}</div>` +
+    `<div class="meta">frames per pass · ${verdict}` +
+    (base != null ? ` · your baseline ${fpp(base)}` : "") + `</div>` +
     `<div class="bars">${bars}</div>` +
-    `<div class="meta">hit rate, last ${Math.min(21, d.days.length)} days — frames heard / passes available</div></div>` +
+    `<div class="meta">frames heard per pass available, daily — last ${Math.min(21, d.days.length)} days</div></div>` +
     (passes ? `<div class="card"><b>Next passes</b><table>${passes}</table></div>`
             : `<div class="card meta">No computed passes for this station yet — they cover the most active stations.</div>`) +
     (past ? `<div class="card"><b>Recent passes</b><table>${past}</table></div>` : "");
