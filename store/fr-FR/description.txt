@@ -1,0 +1,17 @@
+Overwatch répond à la question que se pose chaque opérateur de station sol : ma station va bien ?
+
+Choisissez votre station une fois. L'application s'ouvre ensuite directement dessus : votre taux de réception comparé à votre propre historique — jamais un chiffre absolu, car une station qui suit d'autres satellites n'est pas une moins bonne station — avec trois semaines d'historique et un verdict clair : réception habituelle, ou en dessous de votre référence.
+
+CHAQUE PASSAGE EN DÉTAIL
+Chaque passage récent montre les trames décodées par votre station. Ouvrez un passage pour la chronologie trame par trame : des marques réparties sur toute la fenêtre signalent une chaîne saine ; des marques groupées autour de l'élévation maximale suggèrent un problème d'horizon. Touchez une trame pour voir chaque valeur décodée — tensions batterie, températures, mode du satellite.
+
+PROCHAINS PASSAGES
+Heures de lever et élévation maximale de la flotte suivie au-dessus de votre station.
+
+LES SATELLITES
+Positions en direct, altitude, éclipse et dernière réception, à partir du réseau SatNOGS et des éléments orbitaux CelesTrak. La salle de contrôle web complète sur overwatch.confinia.io reste à un lien.
+
+CONSTRUIT SUR DES DONNÉES OUVERTES
+Tout est calculé depuis les observations ouvertes du réseau de stations bénévoles SatNOGS. Overwatch ne voit votre station qu'à travers les satellites qu'il suit — l'application le dit plutôt que de vous le laisser découvrir.
+
+Sans compte. Sans publicité. Sans traceur. Logiciel libre.

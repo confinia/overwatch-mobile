@@ -22,10 +22,10 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         DEVELOPMENT_TEAM: "38WRV3R7D5"
         PRODUCT_BUNDLE_IDENTIFIER: io.confinia.overwatch
-        # "Overwatch Dev", amber icon: the native builds are the internal dev
-        # vehicle (PWA-first rule) and must never be mistaken for the product
-        # on a home screen — that confusion cost real debugging time.
-        INFOPLIST_KEY_CFBundleDisplayName: "Overwatch Dev"
+        # Native IS the product since the 2026-08-28 pivot: it wears the
+        # product name and icon. (The amber "Dev" era was for coexisting with
+        # a primary PWA.)
+        INFOPLIST_KEY_CFBundleDisplayName: "Overwatch"
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"

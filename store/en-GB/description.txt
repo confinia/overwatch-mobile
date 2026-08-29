@@ -1,0 +1,17 @@
+Overwatch answers the one question every satellite ground-station operator has: is my station okay?
+
+Pick your station once. From then on the app opens straight onto it: your reception rate compared against your own history — never an absolute number, because a station that tracks different satellites is not a worse station — with a three-week sparkline and a plain verdict: hearing as usual, or below your baseline.
+
+DRILL INTO EVERY PASS
+Each recent pass shows the frames your station decoded during it. Open a pass for the frame-by-frame timeline: ticks spread across the whole window mean a healthy chain; ticks clustered around the highest elevation suggest a horizon problem. Tap any frame to see every decoded value — battery voltages, temperatures, spacecraft mode.
+
+NEXT PASSES
+Rise times and peak elevation for the tracked fleet over your station, so you know when to listen.
+
+THE SATELLITES
+Live positions, altitude, eclipse state and last-heard times for the fleet, drawn from the SatNOGS network and CelesTrak orbital elements. Tap any satellite for its card; the full web control room at overwatch.confinia.io is one link away when you want the globe and the deep dashboards.
+
+BUILT ON OPEN DATA
+Everything in the app is computed from the open observations of the SatNOGS volunteer ground-station network. Overwatch sees your station only through the satellites it tracks — the app says so rather than letting you discover it.
+
+No account. No ads. No trackers. Open source.
