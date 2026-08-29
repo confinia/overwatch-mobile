@@ -105,6 +105,10 @@ async function station(observer){
   view.innerHTML =
     `<a class="back" href="#" onclick="home(true);return false">‹ stations</a>` +
     `<div class="card"><b>${esc(d.observer)}</b>` +
+    // how this station's frames arrive — SatNOGS's own app_source; shown
+    // only when the API knows (one operator runs both kinds, DL7NDR #97)
+    (d.source === "network" ? `<div class="meta">SatNOGS network station</div>`
+     : d.source === "sids" ? `<div class="meta">direct-upload station (SiDS)</div>` : "") +
     `<button class="watch" id="watch-btn" onclick="toggleWatch('${esc(d.observer)}')">…</button>` +
     `<div class="big ${cls}">${rate == null ? "—" : fpp(rate)}</div>` +
     `<div class="meta">frames per pass · ${verdict}` +
