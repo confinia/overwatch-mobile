@@ -112,7 +112,7 @@ async function station(observer){
     `<div class="bars">${bars}</div>` +
     `<div class="meta">frames heard per pass available, daily — last ${Math.min(21, d.days.length)} days</div></div>` +
     (passes ? `<div class="card"><b>Next passes</b><table>${passes}</table></div>`
-            : `<div class="card meta">No computed passes for this station yet — they cover the most active stations.</div>`) +
+            : `<div class="card meta">No passes computed for this station yet — predictions need a station position (Maidenhead locator in the SatNOGS name) and at least one reception in the last 7 days.</div>`) +
     (past ? `<div class="card"><b>Recent passes</b><table>${past}</table></div>` : "");
 }
 
