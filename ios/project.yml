@@ -34,8 +34,31 @@ targets:
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
 
+  # Drives the app for store screenshots and the review demo video: taps
+  # through station -> pass -> frame, ASSERTING each screen's content before
+  # capturing — the guard against ever again shipping a picture of the wrong
+  # screen (the Chrome-wizard lesson).
+  OverwatchUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Overwatch/UITests
+    dependencies:
+      - target: Overwatch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        DEVELOPMENT_TEAM: "38WRV3R7D5"
+        PRODUCT_BUNDLE_IDENTIFIER: io.confinia.overwatch.uitests
+        SWIFT_VERSION: "5.0"
+        TEST_TARGET_NAME: Overwatch
+
 schemes:
   Overwatch:
     build:
       targets:
         Overwatch: all
+        OverwatchUITests: [test]
+    test:
+      targets:
+        - OverwatchUITests
