@@ -54,6 +54,25 @@ struct StationList: View {
     }
 }
 
+/// The API sends fractional seconds ("2026-08-31T14:26:44.539006+00:00").
+/// A default ISO8601DateFormatter does NOT parse those, and every caller here
+/// fell back to printing the raw string, so every pass time on the station
+/// screen rendered as an unformatted timestamp wrapping over three lines.
+/// Try with fractions first, then without, because not every timestamp we are
+/// given carries them.
+enum ISO {
+    private static let withFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let plain = ISO8601DateFormatter()
+
+    static func date(_ s: String) -> Date? {
+        withFraction.date(from: s) ?? plain.date(from: s)
+    }
+}
+
 struct StationView: View {
     let observer: String
     @AppStorage("station") private var saved = ""
@@ -127,7 +146,7 @@ struct StationView: View {
     }
 
     func when(_ iso: String) -> String {
-        guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }
+        guard let d = ISO.date(iso) else { return iso }
         let f = DateFormatter(); f.dateFormat = "EEE HH:mm"
         return f.string(from: d)
     }
@@ -284,7 +303,7 @@ struct PassDetailView: View {
     }
 
     func hms(_ iso: String) -> String {
-        guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }
+        guard let d = ISO.date(iso) else { return iso }
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
         return f.string(from: d)
     }
@@ -394,7 +413,7 @@ struct SatCardView: View {
     }
 
     func when(_ iso: String) -> String {
-        guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }
+        guard let d = ISO.date(iso) else { return iso }
         let f = DateFormatter(); f.dateFormat = "d MMM HH:mm"
         return f.string(from: d)
     }
@@ -416,8 +435,7 @@ struct Timeline: View {
         }.frame(height: 20)
     }
     func offset(_ f: API.Frame, width: CGFloat) -> CGFloat {
-        let iso = ISO8601DateFormatter()
-        guard let a = iso.date(from: detail.aos), let t = iso.date(from: f.ts),
+        guard let a = ISO.date(detail.aos), let t = ISO.date(f.ts),
               detail.duration_s > 0 else { return 0 }
         let x = t.timeIntervalSince(a) / Double(detail.duration_s)
         return CGFloat(min(max(x, 0), 1)) * max(width - 2, 0)
