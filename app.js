@@ -43,15 +43,29 @@ async function search(){
   let stations = [];
   try { stations = await j("/stations"); } catch (e) { return fail(e); }
   if (mine !== seq) return;
+  // Operators refer to their station by its SatNOGS NUMBER, because that is
+  // what the Network URL of their own page shows. PE2BZ asked for 1433 and
+  // the box only matched names (#417). A digits-only query matches the id;
+  // anything else keeps matching the name, so a callsign still works.
+  const digits = /^\d+$/.test(qv);
   const hits = stations
-    .filter(s => !qv || s.observer.toLowerCase().includes(qv))
+    .filter(s => !qv || (digits ? String(s.station_id || "") === qv
+                                : s.observer.toLowerCase().includes(qv)))
     .slice(0, 12);
   document.getElementById("results").innerHTML = hits.map(s =>
     `<div class="card hit" onclick="station('${esc(s.observer)}')">` +
     `<div><b>${esc(s.observer)}</b>` +
-    `<div class="meta">${s.frames} frames · ${s.satellites} satellites · 7 days</div></div>` +
+    `<div class="meta">${s.station_id ? "station " + s.station_id + " · " : ""}` +
+    `${s.frames} frames · ${s.satellites} satellites · 7 days</div></div>` +
     `<div class="meta">›</div></div>`).join("")
-    || `<div class="card meta">Nothing matching — stations appear once they are heard receiving the tracked fleet.</div>`;
+    // Say WHY, not just "nothing". We only know stations that decoded a frame
+    // for one of the satellites we track, so a station doing S-band with no
+    // open decoder is invisible here however it is searched (#417).
+    || `<div class="card meta">No station matching ${qv ? `"${esc(qv)}"` : "that"}.` +
+       `<br><br>A station appears here once it has decoded a frame for one of ` +
+       `the satellites Overwatch tracks. Stations that only produce waterfalls, ` +
+       `or work satellites with no open decoder, never reach the telemetry ` +
+       `database and cannot be shown.</div>`;
 }
 
 async function station(observer){
