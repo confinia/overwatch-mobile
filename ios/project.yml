@@ -60,5 +60,10 @@ schemes:
         Overwatch: all
         OverwatchUITests: [test]
     test:
-      targets:
-        - OverwatchUITests
+      # The test plan turns each UI-test run into a SCREEN RECORDING kept in
+      # the result bundle — on a physical device this is the "captured on a
+      # physical device" demo video Apple asks for, harvested with
+      # xcresulttool, no human hand on the phone (#376 review).
+      testPlans:
+        - path: Overwatch.xctestplan
+          defaultPlan: true

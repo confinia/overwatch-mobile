@@ -1,0 +1,29 @@
+{
+  "configurations" : [
+    {
+      "id" : "0B1E5C51-DEMO-4WAL-K001-000000000001",
+      "name" : "Demo",
+      "options" : {
+        "preferredScreenCaptureFormat" : "screenRecording",
+        "systemAttachmentLifetime" : "keepAlways",
+        "userAttachmentLifetime" : "keepAlways"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "preferredScreenCaptureFormat" : "screenRecording",
+    "systemAttachmentLifetime" : "keepAlways",
+    "userAttachmentLifetime" : "keepAlways",
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Overwatch.xcodeproj",
+        "identifier" : "OverwatchUITests",
+        "name" : "OverwatchUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
