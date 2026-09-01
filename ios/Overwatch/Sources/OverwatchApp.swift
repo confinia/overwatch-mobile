@@ -69,7 +69,18 @@ enum ISO {
     private static let plain = ISO8601DateFormatter()
 
     static func date(_ s: String) -> Date? {
-        withFraction.date(from: s) ?? plain.date(from: s)
+        if let d = withFraction.date(from: s) ?? plain.date(from: s) {
+            return d
+        }
+        // The API sends MICROSECOND fractions ("16:38:22.004921+00:00").
+        // withFractionalSeconds parses exactly three digits, so both
+        // formatters fail on six and the raw string leaked to the screen
+        // again — the "fixed" builds 2 and 3 never actually parsed a single
+        // real timestamp. Second-level precision is all the UI shows, so
+        // strip the fraction and parse plainly.
+        let stripped = s.replacingOccurrences(of: #"\.\d+"#, with: "",
+                                              options: .regularExpression)
+        return plain.date(from: stripped)
     }
 }
 
