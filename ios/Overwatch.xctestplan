@@ -1,29 +1,24 @@
 {
-  "configurations" : [
+  "configurations": [
     {
-      "id" : "0B1E5C51-DEMO-4WAL-K001-000000000001",
-      "name" : "Demo",
-      "options" : {
-        "preferredScreenCaptureFormat" : "screenRecording",
-        "systemAttachmentLifetime" : "keepAlways",
-        "userAttachmentLifetime" : "keepAlways"
-      }
+      "id": "327CE1DD-8972-4A7E-81E2-3E915B13BCC0",
+      "name": "Demo",
+      "options": {}
     }
   ],
-  "defaultOptions" : {
-    "preferredScreenCaptureFormat" : "screenRecording",
-    "systemAttachmentLifetime" : "keepAlways",
-    "userAttachmentLifetime" : "keepAlways",
-    "testTimeoutsEnabled" : true
+  "defaultOptions": {
+    "preferredScreenCaptureFormat": "screenRecording",
+    "systemAttachmentLifetime": "keepAlways",
+    "userAttachmentLifetime": "keepAlways"
   },
-  "testTargets" : [
+  "testTargets": [
     {
-      "target" : {
-        "containerPath" : "container:Overwatch.xcodeproj",
-        "identifier" : "OverwatchUITests",
-        "name" : "OverwatchUITests"
+      "target": {
+        "containerPath": "container:Overwatch.xcodeproj",
+        "identifier": "OverwatchUITests",
+        "name": "OverwatchUITests"
       }
     }
   ],
-  "version" : 1
+  "version": 1
 }
