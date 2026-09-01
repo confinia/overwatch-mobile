@@ -213,13 +213,23 @@ struct PassCard<Detail: View>: View {
     }
     func rowBody(_ p: API.Pass, chevron: Bool) -> some View {
         HStack {
-                    // in-app card, not Safari: the control room is a desk
-                    // tool, and the card answers "what is this?" in one screen
-                    NavigationLink { SatCardView(norad: p.norad,
-                                                 satName: p.satellite) }
-                        label: { Text(p.satellite)
-                            .foregroundStyle(Color.accentColor) }
-                        .buttonStyle(.plain)
+                    // A NavigationLink nested INSIDE another link's label
+                    // breaks hit-testing on iOS 16 hardware: the outer row
+                    // link never fires and the tap does nothing (found by an
+                    // operator on an iPhone X; simulators never showed it).
+                    // So the satellite-name link exists only where the row
+                    // itself is not a link; on tappable rows the name is
+                    // plain text and the sat card moves into the pass view.
+                    if chevron {
+                        Text(p.satellite)
+                            .foregroundStyle(Color.accentColor)
+                    } else {
+                        NavigationLink { SatCardView(norad: p.norad,
+                                                     satName: p.satellite) }
+                            label: { Text(p.satellite)
+                                .foregroundStyle(Color.accentColor) }
+                            .buttonStyle(.plain)
+                    }
                     Spacer()
                     if let f = p.frames {
                         Text(f > 0 ? "\(f) frames" : "nothing heard")
@@ -295,6 +305,16 @@ struct PassDetailView: View {
         }
         .navigationTitle(pass.satellite)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // the sat card used to hang off the satellite name in the pass
+            // row, nested inside the row's own link — the iOS 16 freeze.
+            // It lives here now, one level in, reachable without nesting.
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink("About") {
+                    SatCardView(norad: pass.norad, satName: pass.satellite)
+                }
+            }
+        }
         .task {
             do { detail = try await API.passDetail(observer,
                     norad: pass.norad, aos: pass.aos) }
