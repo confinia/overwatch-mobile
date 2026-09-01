@@ -60,10 +60,12 @@ schemes:
         Overwatch: all
         OverwatchUITests: [test]
     test:
-      # The test plan turns each UI-test run into a SCREEN RECORDING kept in
-      # the result bundle — on a physical device this is the "captured on a
-      # physical device" demo video Apple asks for, harvested with
-      # xcresulttool, no human hand on the phone (#376 review).
-      testPlans:
-        - path: Overwatch.xctestplan
-          defaultPlan: true
+      # NO test plan, on purpose. Plan-based test actions route through the
+      # modern device stack, which cannot reach an iOS 16 device (devicectl
+      # sees nothing while ios-deploy connects fine), and every plan run on
+      # the iPhone X died with "Logic Testing Unavailable" — with the
+      # Testables filled and the blueprint identifier correct. Plain targets
+      # is the configuration the legacy stack accepts; video capture, where
+      # needed, has to come from outside the result bundle on this device.
+      targets:
+        - OverwatchUITests
